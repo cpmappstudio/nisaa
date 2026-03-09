@@ -1,7 +1,5 @@
-import { preloadQuery } from "convex/nextjs";
-import { api } from "@/convex/_generated/api";
 import { getAuthToken } from "@/lib/auth/auth";
-import { SeasonStatsPage } from "@/components/sections/shell/stats/season-stats-page";
+import { resolveLeagueSportModule } from "@/lib/sports/server";
 
 type Params = Promise<{
   locale: string;
@@ -10,16 +8,13 @@ type Params = Promise<{
 }>;
 
 export default async function TeamStatsPage({ params }: { params: Params }) {
-  const { tenant } = await params;
+  const { tenant, team } = await params;
   const token = await getAuthToken();
+  const sportModule = await resolveLeagueSportModule(tenant, token);
 
-  const preloadedSeasons = await preloadQuery(
-    api.leagueSettings.listSeasons,
-    {
-      leagueSlug: tenant,
-    },
-    { token },
-  );
-
-  return <SeasonStatsPage preloadedSeasons={preloadedSeasons} orgSlug={tenant} />;
+  return await sportModule.renderTeamStatsPage({
+    tenant,
+    teamSlug: team,
+    token,
+  });
 }

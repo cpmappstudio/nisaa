@@ -26,6 +26,7 @@ import { DEFAULT_TENANT_SLUG, isSingleTenantMode } from "@/lib/tenancy/config";
 
 type Gender = "male" | "female" | "mixed";
 type DivisionType = "alphabetic" | "greek" | "numeric";
+type SportType = "basketball" | "soccer";
 
 interface NewCategory {
   name: string;
@@ -84,12 +85,18 @@ export function TeamConfigSettings() {
   const [savingPositionId, setSavingPositionId] = useState<string | null>(null);
   const [showAllAgeCategories, setShowAllAgeCategories] = useState(false);
   const [showAllPositions, setShowAllPositions] = useState(false);
+  const [isUpdatingSportType, setIsUpdatingSportType] = useState(false);
 
   const teamConfig = useQuery(
     api.leagueSettings.getTeamConfig,
     leagueSlug ? { leagueSlug } : "skip",
   );
+  const sportTypeChangeStatus = useQuery(
+    api.leagueSettings.getSportTypeChangeStatus,
+    leagueSlug ? { leagueSlug } : "skip",
+  );
 
+  const updateSportType = useMutation(api.leagueSettings.updateSportType);
   const addAgeCategory = useMutation(api.leagueSettings.addAgeCategory);
   const removeAgeCategory = useMutation(api.leagueSettings.removeAgeCategory);
   const updateAgeCategory = useMutation(api.leagueSettings.updateAgeCategory);
@@ -135,6 +142,25 @@ export function TeamConfigSettings() {
   const horizontalDivisions = teamConfig.horizontalDivisions ?? {
     enabled: false,
     type: "alphabetic" as DivisionType,
+  };
+  const sportTypeLocked = sportTypeChangeStatus
+    ? !sportTypeChangeStatus.canChange
+    : false;
+
+  const handleSportTypeChange = async (nextSportType: SportType) => {
+    if (nextSportType === teamConfig.sportType) {
+      return;
+    }
+
+    setIsUpdatingSportType(true);
+    try {
+      await updateSportType({
+        leagueSlug,
+        sportType: nextSportType,
+      });
+    } finally {
+      setIsUpdatingSportType(false);
+    }
   };
 
   const handleAddCategory = async () => {
@@ -301,6 +327,42 @@ export function TeamConfigSettings() {
 
   return (
     <div className="flex flex-col gap-8">
+      <SettingsItem
+        title={t("sportType.title")}
+        description={
+          sportTypeLocked
+            ? t("sportType.lockedDescription")
+            : t("sportType.description")
+        }
+      >
+        <div className="max-w-xs space-y-2">
+          <Select
+            value={teamConfig.sportType}
+            onValueChange={(value) => handleSportTypeChange(value as SportType)}
+            disabled={sportTypeLocked || isUpdatingSportType}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("sportType.placeholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="basketball">
+                {t("sportType.options.basketball")}
+              </SelectItem>
+              <SelectItem value="soccer">
+                {t("sportType.options.soccer")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          {sportTypeLocked && (
+            <p className="text-sm text-muted-foreground">
+              {sportTypeChangeStatus?.hasPlayers
+                ? t("sportType.lockedReasons.players")
+                : t("sportType.lockedReasons.games")}
+            </p>
+          )}
+        </div>
+      </SettingsItem>
+
       {/* Age Categories */}
       <SettingsItem
         title={t("ageCategories.title")}

@@ -137,6 +137,26 @@
       "injured": "Injured",
       "suspended": "Suspended",
       "inactive": "Inactive"
+    },
+    "cometNumber": "Comet No.",
+    "fifaId": "FIFA ID",
+    "documentNumber": "Document No.",
+    "gender": "Gender",
+    "selectGender": "Select gender",
+    "genderOptions": {
+      "male": "Male",
+      "female": "Female",
+      "mixed": "Mixed"
+    },
+    "firstSurname": "First Surname",
+    "secondSurname": "Second Surname",
+    "givenNames": "Given Names",
+    "dominantProfile": "Dominant Profile",
+    "selectDominantProfile": "Select dominant profile",
+    "dominantProfileOptions": {
+      "right": "Right",
+      "left": "Left",
+      "both": "Both"
     }
   },
   "position": {

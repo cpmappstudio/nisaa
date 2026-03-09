@@ -1,6 +1,16 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import {
+  query,
+  mutation,
+  internalMutation,
+  type QueryCtx,
+  type MutationCtx,
+} from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { requireOrgAccess, requireOrgAdmin } from "./lib/permissions";
+import { resolveOrganizationBySlug } from "./lib/organizationResolver";
+import { getDefaultSportType } from "./lib/sports";
+import { isSingleTenantMode } from "./lib/tenancy";
 
 // ============================================================================
 // VALIDATORS
@@ -51,12 +61,130 @@ const teamConfigValidator = v.object({
   horizontalDivisions: v.optional(horizontalDivisionsValidator),
 });
 
+const sportTypeChangeStatusValidator = v.object({
+  canChange: v.boolean(),
+  hasGames: v.boolean(),
+  hasPlayers: v.boolean(),
+});
+
+type LeagueSettingsCtx = QueryCtx | MutationCtx;
+type GenderValue = "male" | "female" | "mixed";
+type SportTypeValue = "basketball" | "soccer";
+type HorizontalDivisionsValue = {
+  enabled: boolean;
+  type: "alphabetic" | "greek" | "numeric";
+};
+type AgeCategoryValue = {
+  id: string;
+  name: string;
+  minAge: number;
+  maxAge: number;
+};
+type PositionValue = {
+  id: string;
+  name: string;
+  abbreviation: string;
+};
+type SeasonValue = {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+};
+type LeagueSettingsInsert = {
+  organizationId: Id<"organizations">;
+  sportType: SportTypeValue;
+  ageCategories: AgeCategoryValue[];
+  positions: PositionValue[];
+  enabledGenders: GenderValue[];
+  seasons?: SeasonValue[];
+  horizontalDivisions?: HorizontalDivisionsValue;
+};
+
+const DEFAULT_ENABLED_GENDERS: GenderValue[] = ["male", "female"];
+const DEFAULT_POSITIONS_BY_SPORT: Record<SportTypeValue, PositionValue[]> = {
+  basketball: [
+    { id: "point_guard", name: "Point Guard", abbreviation: "PG" },
+    { id: "shooting_guard", name: "Shooting Guard", abbreviation: "SG" },
+    { id: "small_forward", name: "Small Forward", abbreviation: "SF" },
+    { id: "power_forward", name: "Power Forward", abbreviation: "PF" },
+    { id: "center", name: "Center", abbreviation: "C" },
+  ],
+  soccer: [
+    { id: "goalkeeper", name: "Goalkeeper", abbreviation: "GK" },
+    { id: "defender", name: "Defender", abbreviation: "DEF" },
+    { id: "midfielder", name: "Midfielder", abbreviation: "MID" },
+    { id: "forward", name: "Forward", abbreviation: "FWD" },
+  ],
+};
+
+function getDefaultPositionsForSport(
+  sport: SportTypeValue = getDefaultSportType(),
+): PositionValue[] {
+  return DEFAULT_POSITIONS_BY_SPORT[sport].map((position) => ({ ...position }));
+}
+
 function getTodayDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 function isIsoDateString(date: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(date);
+}
+
+function buildLeagueSettingsInsert(
+  organizationId: Id<"organizations">,
+  overrides: Partial<Omit<LeagueSettingsInsert, "organizationId">> = {},
+): LeagueSettingsInsert {
+  const sport = overrides.sportType ?? getDefaultSportType();
+  return {
+    organizationId,
+    sportType: sport,
+    ageCategories: [],
+    positions: getDefaultPositionsForSport(sport),
+    enabledGenders: [...DEFAULT_ENABLED_GENDERS],
+    ...overrides,
+  };
+}
+
+async function getSportTypeChangeStatusForOrganization(
+  ctx: LeagueSettingsCtx,
+  organizationId: Id<"organizations">,
+) {
+  const games = await ctx.db
+    .query("games")
+    .withIndex("byOrganization", (q) => q.eq("organizationId", organizationId))
+    .take(1);
+  const hasGames = games.length > 0;
+
+  const clubs = await ctx.db
+    .query("clubs")
+    .withIndex("byOrganization", (q) => q.eq("organizationId", organizationId))
+    .collect();
+
+  if (clubs.length === 0) {
+    return {
+      canChange: !hasGames,
+      hasGames,
+      hasPlayers: false,
+    };
+  }
+
+  const playersByClub = await Promise.all(
+    clubs.map((club) =>
+      ctx.db
+        .query("players")
+        .withIndex("byClub", (q) => q.eq("clubId", club._id))
+        .take(1),
+    ),
+  );
+  const hasPlayers = playersByClub.some((players) => players.length > 0);
+
+  return {
+    canChange: !hasGames && !hasPlayers,
+    hasGames,
+    hasPlayers,
+  };
 }
 
 // ============================================================================
@@ -71,10 +199,7 @@ export const getTeamConfig = query({
   args: { leagueSlug: v.string() },
   returns: v.union(teamConfigValidator, v.null()),
   handler: async (ctx, args) => {
-    const org = await ctx.db
-      .query("organizations")
-      .withIndex("bySlug", (q) => q.eq("slug", args.leagueSlug))
-      .unique();
+    const org = await resolveOrganizationBySlug(ctx, args.leagueSlug);
 
     if (!org) {
       return null;
@@ -88,12 +213,10 @@ export const getTeamConfig = query({
     if (!settings) {
       // Return default configuration
       return {
-        sportType: "basketball" as const,
+        sportType: getDefaultSportType(),
         ageCategories: [],
-        positions: [],
-        enabledGenders: ["male", "female"] as Array<
-          "male" | "female" | "mixed"
-        >,
+        positions: getDefaultPositionsForSport(getDefaultSportType()),
+        enabledGenders: [...DEFAULT_ENABLED_GENDERS],
         horizontalDivisions: undefined,
       };
     }
@@ -128,10 +251,7 @@ export const getByLeagueSlug = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const org = await ctx.db
-      .query("organizations")
-      .withIndex("bySlug", (q) => q.eq("slug", args.leagueSlug))
-      .unique();
+    const org = await resolveOrganizationBySlug(ctx, args.leagueSlug);
 
     if (!org) {
       return null;
@@ -162,6 +282,40 @@ export const listSeasons = query({
 
     const seasons = settings?.seasons ?? [];
     return [...seasons].sort((a, b) => b.startDate.localeCompare(a.startDate));
+  },
+});
+
+/**
+ * Resolve the configured sport type for a league.
+ * Defaults to basketball when league settings have not been created yet.
+ */
+export const getSportTypeByLeagueSlug = query({
+  args: { leagueSlug: v.string() },
+  returns: sportType,
+  handler: async (ctx, args) => {
+    const organization = await resolveOrganizationBySlug(ctx, args.leagueSlug);
+
+    if (!organization) {
+      return getDefaultSportType();
+    }
+
+    const settings = await ctx.db
+      .query("leagueSettings")
+      .withIndex("byOrganization", (q) =>
+        q.eq("organizationId", organization._id),
+      )
+      .unique();
+
+    return settings?.sportType ?? getDefaultSportType();
+  },
+});
+
+export const getSportTypeChangeStatus = query({
+  args: { leagueSlug: v.string() },
+  returns: sportTypeChangeStatusValidator,
+  handler: async (ctx, args) => {
+    const { organization } = await requireOrgAdmin(ctx, args.leagueSlug);
+    return await getSportTypeChangeStatusForOrganization(ctx, organization._id);
   },
 });
 
@@ -242,6 +396,99 @@ export const upsert = mutation({
   },
 });
 
+export const updateSportType = mutation({
+  args: {
+    leagueSlug: v.string(),
+    sportType,
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { organization } = await requireOrgAdmin(ctx, args.leagueSlug);
+
+    const settings = await ctx.db
+      .query("leagueSettings")
+      .withIndex("byOrganization", (q) =>
+        q.eq("organizationId", organization._id),
+      )
+      .unique();
+
+    if (!settings) {
+      await ctx.db.insert(
+        "leagueSettings",
+        buildLeagueSettingsInsert(organization._id, {
+          sportType: args.sportType,
+        }),
+      );
+      return null;
+    }
+
+    if (settings.sportType === args.sportType) {
+      return null;
+    }
+
+    const changeStatus = await getSportTypeChangeStatusForOrganization(
+      ctx,
+      organization._id,
+    );
+    if (!changeStatus.canChange) {
+      throw new Error(
+        "Sport type cannot be changed after players or games have been created",
+      );
+    }
+
+    await ctx.db.patch(settings._id, {
+      sportType: args.sportType,
+      positions: getDefaultPositionsForSport(args.sportType),
+    });
+
+    return null;
+  },
+});
+
+export const ensureDefaultForLeagueSlug = internalMutation({
+  args: { leagueSlug: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const organization = await resolveOrganizationBySlug(ctx, args.leagueSlug);
+    if (!organization) {
+      return null;
+    }
+
+    const settings = await ctx.db
+      .query("leagueSettings")
+      .withIndex("byOrganization", (q) =>
+        q.eq("organizationId", organization._id),
+      )
+      .unique();
+
+    const defaultSportType = getDefaultSportType();
+
+    if (!settings) {
+      await ctx.db.insert(
+        "leagueSettings",
+        buildLeagueSettingsInsert(organization._id),
+      );
+      return null;
+    }
+
+    if (isSingleTenantMode() && settings.sportType !== defaultSportType) {
+      const changeStatus = await getSportTypeChangeStatusForOrganization(
+        ctx,
+        organization._id,
+      );
+
+      if (changeStatus.canChange) {
+        await ctx.db.patch(settings._id, {
+          sportType: defaultSportType,
+          positions: getDefaultPositionsForSport(defaultSportType),
+        });
+      }
+    }
+
+    return null;
+  },
+});
+
 /**
  * Add an age category.
  */
@@ -263,13 +510,12 @@ export const addAgeCategory = mutation({
 
     if (!settings) {
       // Create settings with just this category
-      await ctx.db.insert("leagueSettings", {
-        organizationId: organization._id,
-        sportType: "basketball",
-        ageCategories: [args.category],
-        positions: [],
-        enabledGenders: ["male", "female"],
-      });
+      await ctx.db.insert(
+        "leagueSettings",
+        buildLeagueSettingsInsert(organization._id, {
+          ageCategories: [args.category],
+        }),
+      );
       return null;
     }
 
@@ -409,13 +655,12 @@ export const updateEnabledGenders = mutation({
 
     if (!settings) {
       // Create settings with enabled genders
-      await ctx.db.insert("leagueSettings", {
-        organizationId: organization._id,
-        sportType: "basketball",
-        ageCategories: [],
-        positions: [],
-        enabledGenders: args.enabledGenders,
-      });
+      await ctx.db.insert(
+        "leagueSettings",
+        buildLeagueSettingsInsert(organization._id, {
+          enabledGenders: args.enabledGenders,
+        }),
+      );
       return null;
     }
 
@@ -448,14 +693,12 @@ export const updateHorizontalDivisions = mutation({
 
     if (!settings) {
       // Create settings with horizontal divisions
-      await ctx.db.insert("leagueSettings", {
-        organizationId: organization._id,
-        sportType: "basketball",
-        ageCategories: [],
-        positions: [],
-        enabledGenders: ["male", "female"],
-        horizontalDivisions: args.horizontalDivisions,
-      });
+      await ctx.db.insert(
+        "leagueSettings",
+        buildLeagueSettingsInsert(organization._id, {
+          horizontalDivisions: args.horizontalDivisions,
+        }),
+      );
       return null;
     }
 
@@ -488,13 +731,12 @@ export const addPosition = mutation({
 
     if (!settings) {
       // Create settings with just this position
-      await ctx.db.insert("leagueSettings", {
-        organizationId: organization._id,
-        sportType: "basketball",
-        ageCategories: [],
-        positions: [args.position],
-        enabledGenders: ["male", "female"],
-      });
+      await ctx.db.insert(
+        "leagueSettings",
+        buildLeagueSettingsInsert(organization._id, {
+          positions: [args.position],
+        }),
+      );
       return null;
     }
 
@@ -648,19 +890,17 @@ export const addSeason = mutation({
       .unique();
 
     if (!settings) {
-      await ctx.db.insert("leagueSettings", {
-        organizationId: organization._id,
-        sportType: "basketball",
-        ageCategories: [],
-        positions: [],
-        enabledGenders: ["male", "female"],
-        seasons: [
-          {
-            ...args.season,
-            name: seasonName,
-          },
-        ],
-      });
+      await ctx.db.insert(
+        "leagueSettings",
+        buildLeagueSettingsInsert(organization._id, {
+          seasons: [
+            {
+              ...args.season,
+              name: seasonName,
+            },
+          ],
+        }),
+      );
       return null;
     }
 

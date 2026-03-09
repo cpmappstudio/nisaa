@@ -82,6 +82,20 @@
       }
     },
     "teamConfig": {
+      "sportType": {
+        "title": "Sport",
+        "description": "Choose the sport module for this league before adding players or games.",
+        "lockedDescription": "This setting is locked because the league already has sport-specific data.",
+        "placeholder": "Select a sport",
+        "options": {
+          "basketball": "Basketball",
+          "soccer": "Soccer"
+        },
+        "lockedReasons": {
+          "players": "Sport type can't be changed after players have been created.",
+          "games": "Sport type can't be changed after games have been created."
+        }
+      },
       "ageCategories": {
         "title": "Age Categories",
         "description": "Define age groups for {clubs} organization",

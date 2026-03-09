@@ -5,9 +5,11 @@ import {
   internalQuery,
 } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 import { clerkClient } from "./clerk";
 import { api, internal } from "./_generated/api";
 import { DEFAULT_TENANT_SLUG, isSingleTenantMode } from "./lib/tenancy";
+import { resolveSingleTenantRoleFromMetadata } from "./lib/singleTenantRoles";
 
 type SingleTenantAppRole = "admin" | "coach";
 
@@ -19,6 +21,22 @@ type CurrentUserWithMemberships = {
     role: "superadmin" | "admin" | "coach" | "member";
   }>;
 };
+
+function toWebhookLikeUserData(
+  clerkUser: Awaited<ReturnType<typeof clerkClient.users.getUser>>,
+) {
+  return {
+    id: clerkUser.id,
+    email_addresses: clerkUser.emailAddresses.map((emailAddress) => ({
+      email_address: emailAddress.emailAddress,
+    })),
+    first_name: clerkUser.firstName ?? "",
+    last_name: clerkUser.lastName ?? "",
+    image_url: clerkUser.imageUrl ?? undefined,
+    profile_image_url: clerkUser.imageUrl ?? undefined,
+    public_metadata: clerkUser.publicMetadata ?? {},
+  };
+}
 
 /**
  * Get the current authenticated user's profile with their organization memberships.
@@ -79,7 +97,9 @@ export const me = query({
       organizationIds.map((id) => ctx.db.get(id)),
     );
     const organizationMap = new Map(
-      organizations.filter(Boolean).map((organization) => [organization!._id, organization!]),
+      organizations
+        .filter(Boolean)
+        .map((organization) => [organization!._id, organization!]),
     );
 
     const enrichedMemberships = memberships.map((membership) => {
@@ -238,6 +258,64 @@ export const getByClerkId = internalQuery({
       .query("users")
       .withIndex("byClerkId", (q) => q.eq("clerkId", args.clerkId))
       .unique();
+  },
+});
+
+/**
+ * Ensure the currently authenticated Clerk user exists in Convex.
+ * In single-tenant mode this also guarantees the synthetic membership row.
+ * This keeps local/dev flows working even when webhooks are delayed or absent.
+ */
+export const syncCurrentUser = action({
+  args: {},
+  returns: v.union(
+    v.object({
+      userId: v.id("users"),
+      syncedMembership: v.boolean(),
+    }),
+    v.null(),
+  ),
+  handler: async (
+    ctx,
+  ): Promise<{ userId: Id<"users">; syncedMembership: boolean } | null> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return null;
+    }
+
+    const clerkUser = await clerkClient.users.getUser(identity.subject);
+    const userId: Id<"users"> = await ctx.runMutation(
+      internal.users.upsertFromClerk,
+      {
+        data: toWebhookLikeUserData(clerkUser),
+      },
+    );
+
+    let syncedMembership = false;
+    if (isSingleTenantMode()) {
+      const resolvedRole = resolveSingleTenantRoleFromMetadata({
+        role: clerkUser.publicMetadata?.role,
+        isSuperAdmin: clerkUser.publicMetadata?.isSuperAdmin,
+      });
+
+      await ctx.runMutation(internal.members.upsertFromSingleTenant, {
+        clerkUserId: clerkUser.id,
+        organizationSlug: DEFAULT_TENANT_SLUG,
+        role: resolvedRole,
+      });
+      await ctx.runMutation(
+        internal.leagueSettings.ensureDefaultForLeagueSlug,
+        {
+          leagueSlug: DEFAULT_TENANT_SLUG,
+        },
+      );
+      syncedMembership = true;
+    }
+
+    return {
+      userId,
+      syncedMembership,
+    };
   },
 });
 

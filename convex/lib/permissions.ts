@@ -1,6 +1,8 @@
 import { QueryCtx, MutationCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
 import { getCurrentUser } from "./auth";
+import { resolveOrganizationBySlug } from "./organizationResolver";
+import { isSingleTenantMode } from "./tenancy";
 
 type PermissionCtx = QueryCtx | MutationCtx;
 
@@ -115,10 +117,21 @@ export async function requireOrgAccess(
 ) {
   const user = await getCurrentUser(ctx);
 
-  const organization = await ctx.db
-    .query("organizations")
-    .withIndex("bySlug", (q) => q.eq("slug", organizationSlug))
-    .unique();
+  let organization = await resolveOrganizationBySlug(ctx, organizationSlug);
+
+  if (!organization && isSingleTenantMode()) {
+    const memberships = await ctx.db
+      .query("organizationMembers")
+      .withIndex("byUserId", (q) => q.eq("userId", user._id))
+      .collect();
+
+    const organizationIds = [
+      ...new Set(memberships.map((m) => m.organizationId)),
+    ];
+    if (organizationIds.length === 1) {
+      organization = await ctx.db.get(organizationIds[0]);
+    }
+  }
 
   if (!organization) {
     throw new Error(`Organization "${organizationSlug}" not found`);

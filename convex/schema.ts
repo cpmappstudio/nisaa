@@ -34,6 +34,12 @@ const gender = v.union(
   v.literal("mixed"),
 );
 
+const dominantProfile = v.union(
+  v.literal("right"),
+  v.literal("left"),
+  v.literal("both"),
+);
+
 const gameStatus = v.union(
   v.literal("scheduled"),
   v.literal("awaiting_stats"),
@@ -159,8 +165,11 @@ export default defineSchema({
     // Core identity
     firstName: v.string(),
     lastName: v.string(),
+    secondLastName: v.optional(v.string()),
     photoStorageId: v.optional(v.id("_storage")),
     dateOfBirth: v.optional(v.string()),
+    documentNumber: v.optional(v.string()),
+    gender: v.optional(gender),
 
     // Club relationship
     clubId: v.id("clubs"),
@@ -187,6 +196,16 @@ export default defineSchema({
     .index("byCategory", ["categoryId"])
     .index("byClubAndCategory", ["clubId", "categoryId"])
     .index("byUser", ["userId"]),
+
+  /**
+   * Soccer Player Profiles - Soccer-specific registration/profile fields.
+   */
+  soccerPlayerProfiles: defineTable({
+    playerId: v.id("players"),
+    cometNumber: v.string(),
+    fifaId: v.optional(v.string()),
+    dominantProfile: dominantProfile,
+  }).index("byPlayer", ["playerId"]),
 
   /**
    * Staff - Links users to clubs as staff members (coaches, etc.).
@@ -274,9 +293,9 @@ export default defineSchema({
     .index("byStatus", ["status"]),
 
   /**
-   * Game Player Stats - Individual player statistics for a game.
+   * Basketball Game Player Stats - Basketball-specific player box score storage.
    */
-  gamePlayerStats: defineTable({
+  basketballGamePlayerStats: defineTable({
     gameId: v.id("games"),
     playerId: v.id("players"),
     clubId: v.id("clubs"),

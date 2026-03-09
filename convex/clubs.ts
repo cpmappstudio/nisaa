@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { requireOrgAdmin } from "./lib/permissions";
+import { resolveOrganizationBySlug } from "./lib/organizationResolver";
 
 // ============================================================================
 // VALIDATORS
@@ -51,10 +52,7 @@ export const listByLeague = query({
   args: { orgSlug: v.string() },
   returns: v.array(clubListItemValidator),
   handler: async (ctx, args) => {
-    const org = await ctx.db
-      .query("organizations")
-      .withIndex("bySlug", (q) => q.eq("slug", args.orgSlug))
-      .unique();
+    const org = await resolveOrganizationBySlug(ctx, args.orgSlug);
 
     if (!org) {
       return [];

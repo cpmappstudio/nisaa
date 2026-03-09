@@ -1,7 +1,5 @@
-import { LeagueRosterClient } from "@/components/sections/shell/teams/league-roster-client";
-import { preloadQuery } from "convex/nextjs";
-import { api } from "@/convex/_generated/api";
 import { getAuthToken } from "@/lib/auth/auth";
+import { resolveLeagueSportModule } from "@/lib/sports/server";
 
 interface OrgRosterPageProps {
   params: Promise<{
@@ -12,16 +10,7 @@ interface OrgRosterPageProps {
 export default async function OrgRosterPage({ params }: OrgRosterPageProps) {
   const { tenant } = await params;
   const token = await getAuthToken();
+  const sportModule = await resolveLeagueSportModule(tenant, token);
 
-  const preloadedPlayers = await preloadQuery(
-    api.players.listBasketballPlayersByLeagueSlug,
-    {
-      leagueSlug: tenant,
-    },
-    { token },
-  );
-
-  return (
-    <LeagueRosterClient preloadedPlayers={preloadedPlayers} orgSlug={tenant} />
-  );
+  return sportModule.renderLeagueRosterPage({ tenant, token });
 }

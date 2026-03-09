@@ -1,4 +1,4 @@
-import { PlayerDemoPage } from "@/components/sections/shell/players/player-detail/player-demo-page";
+import { PlayerDemoPage } from "@/components/sections/shell/players/basketball/player-detail/player-demo-page";
 
 interface PlayerDemoRoutePageProps {
   params: Promise<{

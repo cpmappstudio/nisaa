@@ -7,6 +7,7 @@ import {
   requireClubAccess,
   requireClubAccessBySlug,
 } from "./lib/permissions";
+import { resolveOrganizationBySlug } from "./lib/organizationResolver";
 
 // ============================================================================
 // VALIDATORS
@@ -124,10 +125,10 @@ export const listMyClubSlugsByOrganization = query({
       return [];
     }
 
-    const organization = await ctx.db
-      .query("organizations")
-      .withIndex("bySlug", (q) => q.eq("slug", args.organizationSlug))
-      .unique();
+    const organization = await resolveOrganizationBySlug(
+      ctx,
+      args.organizationSlug,
+    );
     if (!organization) {
       return [];
     }

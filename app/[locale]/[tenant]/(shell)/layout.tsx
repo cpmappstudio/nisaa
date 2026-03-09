@@ -9,6 +9,9 @@ import { SportProvider } from "@/components/providers/sport-provider";
 import { getTenantAccess } from "@/lib/auth/tenant-access";
 import { getPrimaryTeamSlug } from "@/lib/auth/team-access";
 import { TEAM_ROUTES } from "@/lib/navigation/routes";
+import { getAuthToken } from "@/lib/auth/auth";
+import { ensureCurrentUserSynced } from "@/lib/auth/sync-current-user";
+import { resolveLeagueSportType } from "@/lib/sports/server";
 import { routing } from "@/i18n/routing";
 import { redirect } from "next/navigation";
 
@@ -20,7 +23,9 @@ interface LayoutProps {
 export default async function OrgLayout({ children, params }: LayoutProps) {
   const { locale, tenant } = await params;
   const localePrefix = locale === routing.defaultLocale ? "" : `/${locale}`;
-  const { hasAccess, role } = await getTenantAccess(tenant);
+  const token = await getAuthToken();
+  await ensureCurrentUserSynced(token);
+  const { hasAccess, role } = await getTenantAccess(tenant, token);
 
   if (!hasAccess) {
     return <OrgMismatchError urlSlug={tenant} />;
@@ -36,8 +41,10 @@ export default async function OrgLayout({ children, params }: LayoutProps) {
     return <CoachTeamResolver organizationSlug={tenant} />;
   }
 
+  const sportType = await resolveLeagueSportType(tenant, token);
+
   return (
-    <SportProvider sportType="basketball">
+    <SportProvider sportType={sportType}>
       <SidebarLayout
         fullWidth
         navbar={<NavbarAppSidebar />}

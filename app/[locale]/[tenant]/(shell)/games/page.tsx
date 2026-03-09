@@ -1,4 +1,4 @@
-import { GamesTable } from "@/components/sections/shell/games/games-table";
+import { GamesTable } from "@/components/sections/shell/games/shared/games-table";
 import { preloadQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { getAuthToken } from "@/lib/auth/auth";

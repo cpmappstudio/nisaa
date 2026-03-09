@@ -1,4 +1,4 @@
-import { TeamCategoriesClient } from "@/components/sections/shell/teams/team-categories-client";
+import { TeamCategoriesClient } from "@/components/sections/shell/teams/shared/team-categories-client";
 import { preloadQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { getAuthToken } from "@/lib/auth/auth";

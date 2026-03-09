@@ -83,7 +83,6 @@
     "status": "Estado",
     "colors": "Colores",
     "colorName": "Nombre del color (ej. Azul marino)",
-
     "statusOptions": {
       "affiliated": "Afiliado",
       "invited": "Invitado",
@@ -138,6 +137,26 @@
       "injured": "Lesionado",
       "suspended": "Suspendido",
       "inactive": "Inactivo"
+    },
+    "cometNumber": "No. Comet",
+    "fifaId": "FIFA ID",
+    "documentNumber": "No. Documento",
+    "gender": "Género",
+    "selectGender": "Seleccionar género",
+    "genderOptions": {
+      "male": "Masculino",
+      "female": "Femenino",
+      "mixed": "Mixto"
+    },
+    "firstSurname": "Apellido 1",
+    "secondSurname": "Apellido 2",
+    "givenNames": "Nombres",
+    "dominantProfile": "Perfil dominante",
+    "selectDominantProfile": "Selecciona el perfil dominante",
+    "dominantProfileOptions": {
+      "right": "Derecho",
+      "left": "Izquierdo",
+      "both": "Ambidiestro"
     }
   },
   "position": {

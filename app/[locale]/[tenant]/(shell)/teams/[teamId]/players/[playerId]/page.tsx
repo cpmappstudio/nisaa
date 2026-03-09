@@ -1,8 +1,5 @@
-import { PlayerDetailClient } from "@/components/sections/shell/players/player-detail/player-detail-client";
-import { preloadQuery } from "convex/nextjs";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { getAuthToken } from "@/lib/auth/auth";
+import { resolveLeagueSportModule } from "@/lib/sports/server";
 
 interface TeamPlayerDetailPageProps {
   params: Promise<{
@@ -17,17 +14,12 @@ export default async function TeamPlayerDetailPage({
 }: TeamPlayerDetailPageProps) {
   const { tenant, teamId, playerId } = await params;
   const token = await getAuthToken();
+  const sportModule = await resolveLeagueSportModule(tenant, token);
 
-  const preloadedPlayer = await preloadQuery(
-    api.players.getBasketballPlayerDetailByClubSlug,
-    {
-      clubSlug: teamId,
-      playerId: playerId as Id<"players">,
-    },
-    { token },
-  );
-
-  return (
-    <PlayerDetailClient preloadedPlayer={preloadedPlayer} orgSlug={tenant} />
-  );
+  return sportModule.renderPlayerDetailPage({
+    tenant,
+    teamSlug: teamId,
+    playerId,
+    token,
+  });
 }

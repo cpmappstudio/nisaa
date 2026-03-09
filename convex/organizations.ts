@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, internalMutation } from "./_generated/server";
+import { deleteBasketballGamePlayerStatsByGame } from "./lib/basketballGamePlayerStats";
 import { requireSuperAdmin } from "./lib/permissions";
 
 const organizationValidator = v.object({
@@ -185,15 +186,9 @@ export const deleteFromClerk = internalMutation({
       )
       .collect();
 
-    // 1. Delete gamePlayerStats for all games
+    // 1. Delete basketball game player stats for all games
     for (const game of games) {
-      const stats = await ctx.db
-        .query("gamePlayerStats")
-        .withIndex("byGame", (q) => q.eq("gameId", game._id))
-        .collect();
-      for (const stat of stats) {
-        await ctx.db.delete(stat._id);
-      }
+      await deleteBasketballGamePlayerStatsByGame(ctx, game._id);
     }
 
     // 2. Delete all games

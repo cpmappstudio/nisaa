@@ -4,7 +4,7 @@ import { use } from "react";
 import { useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
 import { api } from "@/convex/_generated/api";
-import { TeamGeneralForm } from "@/components/sections/shell/teams/basketball/team-settings/team-general-form";
+import { TeamGeneralForm } from "@/components/sections/shell/teams/shared/team-general-form";
 import SettingsItem from "@/components/sections/shell/settings/settings-item";
 
 export default function TeamSettingsPage({

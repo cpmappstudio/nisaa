@@ -1,4 +1,4 @@
-import { TeamStaffClient } from "@/components/sections/shell/teams/team-staff-client";
+import { TeamStaffClient } from "@/components/sections/shell/teams/shared/team-staff-client";
 import { preloadQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { getAuthToken } from "@/lib/auth/auth";

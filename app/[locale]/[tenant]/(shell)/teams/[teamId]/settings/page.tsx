@@ -1,7 +1,5 @@
-import { TeamSettingsClient } from "@/components/sections/shell/teams/basketball/team-settings/team-settings-client";
-import { preloadQuery } from "convex/nextjs";
-import { api } from "@/convex/_generated/api";
 import { getAuthToken } from "@/lib/auth/auth";
+import { resolveLeagueSportModule } from "@/lib/sports/server";
 
 interface TeamSettingsPageProps {
   params: Promise<{
@@ -15,44 +13,11 @@ export default async function TeamSettingsPage({
 }: TeamSettingsPageProps) {
   const { tenant, teamId } = await params;
   const token = await getAuthToken();
+  const sportModule = await resolveLeagueSportModule(tenant, token);
 
-  const preloadedTeam = await preloadQuery(
-    api.clubs.getBySlug,
-    {
-      slug: teamId,
-    },
-    { token },
-  );
-  const preloadedPlayers = await preloadQuery(
-    api.players.listBasketballPlayersByClubSlug,
-    {
-      clubSlug: teamId,
-    },
-    { token },
-  );
-  const preloadedCategories = await preloadQuery(
-    api.categories.listByClubSlugWithPlayerCount,
-    {
-      clubSlug: teamId,
-    },
-    { token },
-  );
-  const preloadedStaff = await preloadQuery(
-    api.staff.listAllByClubSlug,
-    {
-      clubSlug: teamId,
-    },
-    { token },
-  );
-
-  return (
-    <TeamSettingsClient
-      preloadedTeam={preloadedTeam}
-      preloadedPlayers={preloadedPlayers}
-      preloadedCategories={preloadedCategories}
-      preloadedStaff={preloadedStaff}
-      orgSlug={tenant}
-      clubSlug={teamId}
-    />
-  );
+  return sportModule.renderTeamSettingsPage({
+    tenant,
+    teamSlug: teamId,
+    token,
+  });
 }

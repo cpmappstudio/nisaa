@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { requireOrgAdmin } from "./lib/permissions";
+import { resolveOrganizationBySlug } from "./lib/organizationResolver";
 
 // ============================================================================
 // VALIDATORS
@@ -25,10 +26,7 @@ export const listByLeague = query({
   args: { leagueSlug: v.string() },
   returns: v.array(conferenceValidator),
   handler: async (ctx, args) => {
-    const org = await ctx.db
-      .query("organizations")
-      .withIndex("bySlug", (q) => q.eq("slug", args.leagueSlug))
-      .unique();
+    const org = await resolveOrganizationBySlug(ctx, args.leagueSlug);
 
     if (!org) {
       return [];
@@ -61,7 +59,7 @@ export const create = mutation({
     const existing = await ctx.db
       .query("conferences")
       .withIndex("byOrgAndName", (q) =>
-        q.eq("organizationId", organization._id).eq("name", args.name)
+        q.eq("organizationId", organization._id).eq("name", args.name),
       )
       .unique();
 

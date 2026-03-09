@@ -5,38 +5,21 @@ import { WebhookEvent } from "@clerk/backend";
 import { internal } from "./_generated/api";
 import { clerkClient } from "./clerk";
 import { DEFAULT_TENANT_SLUG, isSingleTenantMode } from "./lib/tenancy";
+import {
+  metadataRoleFromResolvedRole,
+  normalizeSingleTenantMetadataRole,
+  resolveSingleTenantRoleFromMetadata,
+  type SingleTenantResolvedRole,
+} from "./lib/singleTenantRoles";
 
 const CLERK_WEBHOOK_PATH = "/clerk-webhook";
 const SINGLE_TENANT_MODE = isSingleTenantMode();
-
-type SingleTenantResolvedRole = "superadmin" | "admin" | "coach";
 
 type PendingStaffInvite = {
   staffRole: string;
   clubId: string;
   categoryId?: string;
 };
-
-function normalizeSingleTenantMetadataRole(
-  role: unknown,
-): "admin" | "coach" | null {
-  if (role === "admin" || role === "coach") {
-    return role;
-  }
-  if (role === "org:admin" || role === "org:superadmin") {
-    return "admin";
-  }
-  if (role === "member" || role === "org:member") {
-    return "coach";
-  }
-  return null;
-}
-
-function metadataRoleFromResolvedRole(
-  role: SingleTenantResolvedRole,
-): "admin" | "coach" {
-  return role === "superadmin" || role === "admin" ? "admin" : "coach";
-}
 
 async function ensureSingleTenantMetadataRole(
   data: {
@@ -66,29 +49,6 @@ async function ensureSingleTenantMetadataRole(
       role: desiredRole,
     },
   });
-}
-
-function resolveSingleTenantRole(data: {
-  public_metadata?: {
-    role?: unknown;
-    isSuperAdmin?: unknown;
-  };
-}): SingleTenantResolvedRole {
-  if (data.public_metadata?.isSuperAdmin === true) {
-    return "superadmin";
-  }
-
-  const role = data.public_metadata?.role;
-  if (role === "superadmin" || role === "org:superadmin") {
-    return "superadmin";
-  }
-  if (role === "admin" || role === "org:admin") {
-    return "admin";
-  }
-  if (role === "coach" || role === "member" || role === "org:member") {
-    return "coach";
-  }
-  return "coach";
 }
 
 function getPendingStaffInvite(
@@ -161,7 +121,10 @@ const handleClerkWebhook = httpAction(async (ctx, request) => {
   try {
     switch (event.type) {
       case "user.created": {
-        const resolvedRole = resolveSingleTenantRole(event.data);
+        const resolvedRole = resolveSingleTenantRoleFromMetadata({
+          role: event.data.public_metadata?.role,
+          isSuperAdmin: event.data.public_metadata?.isSuperAdmin,
+        });
         await ctx.runMutation(internal.users.upsertFromClerk, {
           data: event.data,
         });
@@ -211,7 +174,10 @@ const handleClerkWebhook = httpAction(async (ctx, request) => {
       }
 
       case "user.updated": {
-        const resolvedRole = resolveSingleTenantRole(event.data);
+        const resolvedRole = resolveSingleTenantRoleFromMetadata({
+          role: event.data.public_metadata?.role,
+          isSuperAdmin: event.data.public_metadata?.isSuperAdmin,
+        });
         await ctx.runMutation(internal.users.upsertFromClerk, {
           data: event.data,
         });

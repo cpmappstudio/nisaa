@@ -82,6 +82,20 @@
       }
     },
     "teamConfig": {
+      "sportType": {
+        "title": "Deporte",
+        "description": "Elige el módulo deportivo para esta liga antes de crear jugadores o juegos.",
+        "lockedDescription": "Esta configuración está bloqueada porque la liga ya tiene datos específicos del deporte.",
+        "placeholder": "Selecciona un deporte",
+        "options": {
+          "basketball": "Baloncesto",
+          "soccer": "Fútbol"
+        },
+        "lockedReasons": {
+          "players": "No se puede cambiar el deporte después de crear jugadores.",
+          "games": "No se puede cambiar el deporte después de crear juegos."
+        }
+      },
       "ageCategories": {
         "title": "Categorías de Edad",
         "description": "Define los grupos de edad para la organización de {clubs}",
