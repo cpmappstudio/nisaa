@@ -126,7 +126,7 @@ export default defineSchema({
     organizationId: v.id("organizations"),
     name: v.string(),
     slug: v.string(),
-    nickname: v.optional(v.string()),
+    nickname: v.string(),
     logoStorageId: v.optional(v.id("_storage")),
     colors: v.optional(v.array(v.string())),
     colorNames: v.optional(v.array(v.string())),

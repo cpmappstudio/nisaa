@@ -223,6 +223,7 @@ export function TeamGeneralForm({ team, orgSlug }: TeamGeneralFormProps) {
               }}
               placeholder={t("teams.nickname")}
               pattern="[a-z0-9-]+"
+              required
               title="Only lowercase letters, numbers, and hyphens allowed"
             />
             <p className="text-xs text-muted-foreground mt-1">

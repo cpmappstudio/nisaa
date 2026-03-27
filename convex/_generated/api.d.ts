@@ -24,6 +24,7 @@ import type * as lib_validators from "../lib/validators.js";
 import type * as members from "../members.js";
 import type * as organizations from "../organizations.js";
 import type * as players from "../players.js";
+import type * as rosterImports from "../rosterImports.js";
 import type * as staff from "../staff.js";
 import type * as users from "../users.js";
 
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   members: typeof members;
   organizations: typeof organizations;
   players: typeof players;
+  rosterImports: typeof rosterImports;
   staff: typeof staff;
   users: typeof users;
 }>;

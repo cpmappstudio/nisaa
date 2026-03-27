@@ -19,7 +19,7 @@ const clubValidator = v.object({
   organizationId: v.id("organizations"),
   name: v.string(),
   slug: v.string(),
-  nickname: v.optional(v.string()),
+  nickname: v.string(),
   logoStorageId: v.optional(v.id("_storage")),
   logoUrl: v.optional(v.string()),
   colors: v.optional(v.array(v.string())),
@@ -38,6 +38,22 @@ const clubListItemValidator = v.object({
   }),
   status: clubStatus,
 });
+
+function sanitizeClubNickname(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "")
+    .replace(/^-|-$/g, "");
+}
+
+function requireValidClubNickname(value: string) {
+  const nickname = sanitizeClubNickname(value);
+  if (!nickname) {
+    throw new Error("A valid nickname/slug is required");
+  }
+
+  return nickname;
+}
 
 // ============================================================================
 // QUERIES
@@ -126,7 +142,7 @@ export const listByLeague = query({
       result.push({
         _id: club._id,
         name: club.name,
-        nickname: club.nickname ?? "",
+        nickname: club.nickname ?? club.slug,
         logoUrl,
         headCoach: {
           name: headCoachName,
@@ -162,6 +178,7 @@ export const getBySlug = query({
 
     return {
       ...club,
+      nickname: club.nickname ?? club.slug,
       logoUrl,
     };
   },
@@ -187,6 +204,7 @@ export const getById = query({
 
     return {
       ...club,
+      nickname: club.nickname ?? club.slug,
       logoUrl,
     };
   },
@@ -202,7 +220,7 @@ export const getById = query({
 export const createWithDelegate = mutation({
   args: {
     name: v.string(),
-    nickname: v.optional(v.string()),
+    nickname: v.string(),
     orgSlug: v.string(),
     status: clubStatus,
     logoStorageId: v.optional(v.id("_storage")),
@@ -214,20 +232,8 @@ export const createWithDelegate = mutation({
   handler: async (ctx, args) => {
     const { organization } = await requireOrgAdmin(ctx, args.orgSlug);
 
-    // Use nickname as slug if provided, otherwise generate from name
-    const slug = args.nickname
-      ? args.nickname
-          .toLowerCase()
-          .replace(/[^a-z0-9-]+/g, "")
-          .replace(/^-|-$/g, "")
-      : args.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "");
-
-    if (!slug) {
-      throw new Error("A valid nickname/slug is required");
-    }
+    const nickname = requireValidClubNickname(args.nickname);
+    const slug = nickname;
 
     // Check slug uniqueness within organization
     const existing = await ctx.db
@@ -258,7 +264,7 @@ export const createWithDelegate = mutation({
       organizationId: organization._id,
       name: args.name,
       slug,
-      nickname: args.nickname,
+      nickname,
       logoStorageId: args.logoStorageId,
       colors: args.colors,
       colorNames: args.colorNames,
@@ -309,30 +315,22 @@ export const update = mutation({
     }
 
     // Update slug if nickname changed (nickname is used as slug)
-    if (
-      filteredUpdates.nickname &&
-      typeof filteredUpdates.nickname === "string"
-    ) {
-      const newSlug = filteredUpdates.nickname
-        .toLowerCase()
-        .replace(/[^a-z0-9-]+/g, "")
-        .replace(/^-|-$/g, "");
+    if (typeof filteredUpdates.nickname === "string") {
+      const newNickname = requireValidClubNickname(filteredUpdates.nickname);
 
-      if (newSlug) {
-        // Check uniqueness
-        const existing = await ctx.db
-          .query("clubs")
-          .withIndex("byOrgAndSlug", (q) =>
-            q.eq("organizationId", club.organizationId).eq("slug", newSlug),
-          )
-          .unique();
+      const existing = await ctx.db
+        .query("clubs")
+        .withIndex("byOrgAndSlug", (q) =>
+          q.eq("organizationId", club.organizationId).eq("slug", newNickname),
+        )
+        .unique();
 
-        if (existing && existing._id !== clubId) {
-          throw new Error(`Club with slug "${newSlug}" already exists`);
-        }
-
-        filteredUpdates.slug = newSlug;
+      if (existing && existing._id !== clubId) {
+        throw new Error(`Club with slug "${newNickname}" already exists`);
       }
+
+      filteredUpdates.nickname = newNickname;
+      filteredUpdates.slug = newNickname;
     }
 
     if (Object.keys(filteredUpdates).length > 0) {

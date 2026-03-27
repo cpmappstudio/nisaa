@@ -286,6 +286,7 @@ export function CreateTeamDialog({
                   }}
                   placeholder={t("teams.nickname")}
                   pattern="[a-z0-9-]+"
+                  required
                   title="Only lowercase letters, numbers, and hyphens allowed"
                 />
               </Field>

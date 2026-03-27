@@ -17,6 +17,7 @@ import {
 import { Dribbble } from "lucide-react";
 import { ROUTES, TEAM_ROUTES } from "@/lib/navigation/routes";
 import type { TeamRouteScope } from "./types";
+import { resolvePlayerPositionLabel } from "@/lib/players/positions";
 
 interface RosterGridProps {
   clubSlug: string;
@@ -73,9 +74,10 @@ export function RosterGrid({ clubSlug, orgSlug, routeScope }: RosterGridProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {data.map((player) => {
-        const positionData = player.position
-          ? positionMap.get(player.position)
-          : null;
+        const positionLabel = player.position
+          ? (positionMap.get(player.position)?.abbreviation ??
+            resolvePlayerPositionLabel(player.position, teamConfig?.positions))
+          : undefined;
 
         const playerDetailHref =
           routeScope === "org"
@@ -86,7 +88,7 @@ export function RosterGrid({ clubSlug, orgSlug, routeScope }: RosterGridProps) {
           <PlayerCard
             key={player._id}
             player={player}
-            positionLabel={positionData?.abbreviation}
+            positionLabel={positionLabel}
             onClick={() => router.push(playerDetailHref)}
           />
         );

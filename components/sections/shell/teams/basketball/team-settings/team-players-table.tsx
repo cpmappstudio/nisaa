@@ -34,6 +34,7 @@ import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { PlayerFormDialog } from "./player-form-dialog";
 import { ROUTES, TEAM_ROUTES } from "@/lib/navigation/routes";
 import { getCountryLabel } from "@/lib/countries/countries";
+import { resolvePlayerPositionLabel } from "@/lib/players/positions";
 
 interface PlayerRow {
   _id: string;
@@ -176,7 +177,9 @@ export function TeamPlayersTable({
       cell: ({ row }) => {
         const positionId = row.original.position;
         const positionData = positionId ? positionMap.get(positionId) : null;
-        const label = positionData ? positionData.abbreviation : "—";
+        const label = positionData
+          ? positionData.abbreviation
+          : (resolvePlayerPositionLabel(positionId, positions) ?? "—");
         return <span className="text-sm text-muted-foreground">{label}</span>;
       },
     },

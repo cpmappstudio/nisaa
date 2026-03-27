@@ -21,6 +21,7 @@ import {
   PlayerRecentStatsPreview,
 } from "./player-recent-stats";
 import { PlayerProfileHeader } from "./player-profile-header";
+import { resolvePlayerPositionLabel } from "@/lib/players/positions";
 
 interface PlayerDetailClientProps {
   preloadedPlayer: Preloaded<
@@ -69,6 +70,11 @@ export function PlayerDetailClient({
     }
     return map;
   }, [teamConfig?.positions]);
+  const positions = teamConfig?.positions ?? [];
+  const playerGameLogColumns = useMemo(
+    () => createPlayerGameLogColumns(t, locale),
+    [locale, t],
+  );
 
   if (player === null) {
     return (
@@ -78,27 +84,14 @@ export function PlayerDetailClient({
     );
   }
 
+  const primaryColor = player.clubPrimaryColor ?? null;
+  const darkerColor = primaryColor ? darkenHex(primaryColor, 0.2) : null;
   const positionData = player.position
     ? positionMap.get(player.position)
     : null;
   const positionName = positionData
     ? positionData.name
-    : player.position
-      ? player.position
-          .replaceAll("_", " ")
-          .split(" ")
-          .filter(Boolean)
-          .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
-          .join(" ")
-      : undefined;
-
-  const primaryColor = player.clubPrimaryColor ?? null;
-  const darkerColor = primaryColor ? darkenHex(primaryColor, 0.2) : null;
-  const positions = teamConfig?.positions ?? [];
-  const playerGameLogColumns = useMemo(
-    () => createPlayerGameLogColumns(t, locale),
-    [locale, t],
-  );
+    : resolvePlayerPositionLabel(player.position, positions, "name");
   const gameLogRows = playerGameLog ?? [];
   const canManagePlayerContent =
     player.viewerAccessLevel === "superadmin" ||
