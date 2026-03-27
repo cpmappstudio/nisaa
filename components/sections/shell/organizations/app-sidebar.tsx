@@ -78,9 +78,9 @@ export function SidebarAppSidebar() {
             <Image
               src="/logo_solid.png"
               alt="NISAA"
-              width={220}
-              height={110}
-              className="h-14 w-auto"
+              width={190}
+              height={95}
+              className="h-12 w-auto"
               priority
             />
           </div>
