@@ -74,13 +74,13 @@ export function SidebarAppSidebar() {
     <Sidebar>
       <SidebarHeader>
         {SINGLE_TENANT_MODE ? (
-          <div className="w-full px-2">
+          <div className="flex w-full justify-center px-2">
             <Image
               src="/logo_solid.png"
               alt="NISAA"
-              width={200}
-              height={100}
-              className="h-12 w-auto"
+              width={220}
+              height={110}
+              className="h-14 w-auto"
               priority
             />
           </div>

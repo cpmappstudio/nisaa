@@ -607,7 +607,7 @@ export const importPdfRosters = mutation({
       summaries.push({
         sourceFile: team.sourceFile,
         teamName: requestedTeamName,
-        slug: requestedSlug,
+        slug: sourceSlug,
         finalSlug,
         clubId,
         categoryId,
