@@ -61,6 +61,19 @@
     "league": "League",
     "club": "Club"
   },
+  "imageCropper": {
+    "title": "Adjust image",
+    "description": "Move and zoom the image until the framing looks right.",
+    "zoom": "Zoom",
+    "confirm": "Crop",
+    "previewAlt": "Image preview",
+    "remove": "Remove image",
+    "errors": {
+      "invalidType": "Only image files are supported.",
+      "tooLarge": "File \"{fileName}\" exceeds the maximum size of {size}.",
+      "cropFailed": "The cropped image could not be processed."
+    }
+  },
   "organizationStatus": {
     "active": "Active",
     "inactive": "Inactive",

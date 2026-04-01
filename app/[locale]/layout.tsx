@@ -13,6 +13,7 @@ import { ThemeScript } from "@/components/providers/theme-script";
 import { fontVariables } from "@/lib/fonts";
 import { shadcn } from "@clerk/themes";
 import "@/app/globals.css";
+import "react-easy-crop/react-easy-crop.css";
 
 // NEXT-INTL RELATED
 import { hasLocale, NextIntlClientProvider } from "next-intl";
@@ -74,7 +75,7 @@ export default async function LocaleLayout({
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
-          enableSystem
+          enableSystem={false}
           disableTransitionOnChange
         >
           <ColorSchemeProvider>

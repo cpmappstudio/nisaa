@@ -1,5 +1,10 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import {
+  normalizeAgeGroup,
+  normalizeSpaces,
+} from "../lib/basketball/categories";
+import { syncClubCategoriesForLeagueCategoryRename } from "./lib/categories/helpers";
 import { requireOrgAccess, requireOrgAdmin } from "./lib/permissions";
 
 // ============================================================================
@@ -253,6 +258,13 @@ export const addAgeCategory = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const { organization } = await requireOrgAdmin(ctx, args.leagueSlug);
+    const categoryName = normalizeSpaces(args.category.name);
+    if (!categoryName) {
+      throw new Error("Age category name is required");
+    }
+    if (args.category.minAge > args.category.maxAge) {
+      throw new Error("Minimum age cannot be greater than maximum age");
+    }
 
     const settings = await ctx.db
       .query("leagueSettings")
@@ -266,7 +278,7 @@ export const addAgeCategory = mutation({
       await ctx.db.insert("leagueSettings", {
         organizationId: organization._id,
         sportType: "basketball",
-        ageCategories: [args.category],
+        ageCategories: [{ ...args.category, name: categoryName }],
         positions: [],
         enabledGenders: ["male", "female"],
       });
@@ -274,15 +286,21 @@ export const addAgeCategory = mutation({
     }
 
     // Check for duplicate
+    const semanticCategoryKey = normalizeAgeGroup(categoryName);
     const exists = settings.ageCategories.some(
-      (c) => c.id === args.category.id || c.name === args.category.name,
+      (c) =>
+        c.id === args.category.id ||
+        normalizeAgeGroup(c.name) === semanticCategoryKey,
     );
     if (exists) {
       throw new Error("Age category already exists");
     }
 
     await ctx.db.patch(settings._id, {
-      ageCategories: [...settings.ageCategories, args.category],
+      ageCategories: [
+        ...settings.ageCategories,
+        { ...args.category, name: categoryName },
+      ],
     });
 
     return null;
@@ -337,7 +355,7 @@ export const updateAgeCategory = mutation({
   handler: async (ctx, args) => {
     const { organization } = await requireOrgAdmin(ctx, args.leagueSlug);
 
-    const categoryName = args.name.trim();
+    const categoryName = normalizeSpaces(args.name);
     if (!categoryName) {
       throw new Error("Age category name is required");
     }
@@ -363,9 +381,19 @@ export const updateAgeCategory = mutation({
       throw new Error("Age category not found");
     }
 
+    const currentCategory =
+      settings.ageCategories.find(
+        (category) => category.id === args.categoryId,
+      ) ?? null;
+    if (!currentCategory) {
+      throw new Error("Age category not found");
+    }
+
+    const semanticCategoryKey = normalizeAgeGroup(categoryName);
     const duplicateName = settings.ageCategories.some(
       (category) =>
-        category.id !== args.categoryId && category.name === categoryName,
+        category.id !== args.categoryId &&
+        normalizeAgeGroup(category.name) === semanticCategoryKey,
     );
     if (duplicateName) {
       throw new Error("Age category already exists");
@@ -382,6 +410,13 @@ export const updateAgeCategory = mutation({
             }
           : category,
       ),
+    });
+
+    await syncClubCategoriesForLeagueCategoryRename(ctx, {
+      organizationId: organization._id,
+      leagueCategoryId: args.categoryId,
+      previousAgeGroup: currentCategory.name,
+      nextAgeGroup: categoryName,
     });
 
     return null;

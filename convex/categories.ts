@@ -6,6 +6,14 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import {
+  deriveDivisionFromCategoryName,
+  findLeagueAgeCategoryByAgeGroup,
+  normalizeAgeGroup,
+  normalizeDivision,
+  normalizeSpaces,
+} from "../lib/basketball/categories";
+import { getClubLeagueCategoryConfig } from "./lib/categories/helpers";
 import { requireClubAccess, requireClubAccessBySlug } from "./lib/permissions";
 
 // ============================================================================
@@ -24,6 +32,7 @@ const categoryValidator = v.object({
   _id: v.id("categories"),
   _creationTime: v.number(),
   clubId: v.id("clubs"),
+  leagueCategoryId: v.optional(v.string()),
   name: v.string(),
   ageGroup: v.string(),
   gender: gender,
@@ -33,57 +42,13 @@ const categoryValidator = v.object({
 const categoryWithPlayerCountValidator = v.object({
   _id: v.id("categories"),
   _creationTime: v.number(),
+  leagueCategoryId: v.optional(v.string()),
   name: v.string(),
   ageGroup: v.string(),
   gender: gender,
   status: categoryStatus,
   playerCount: v.number(),
 });
-
-const DEFAULT_DIVISION = "A";
-
-function normalizeSpaces(value: string): string {
-  return value.trim().replace(/\s+/g, " ");
-}
-
-function normalizeAgeGroup(value: string): string {
-  return normalizeSpaces(value).toLowerCase();
-}
-
-function normalizeDivision(value: string): string {
-  return normalizeSpaces(value).toUpperCase();
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
- * Derives a semantic division from a category name.
- * If the name has no explicit division suffix, default to "A".
- */
-function deriveDivisionFromCategoryName(
-  name: string,
-  ageGroup: string,
-): string {
-  const normalizedName = normalizeSpaces(name);
-  const normalizedAgeGroup = normalizeSpaces(ageGroup);
-
-  if (!normalizedName || !normalizedAgeGroup) {
-    return DEFAULT_DIVISION;
-  }
-
-  const prefixRegex = new RegExp(
-    `^${escapeRegExp(normalizedAgeGroup)}(?:\\s+(.*))?$`,
-    "i",
-  );
-  const match = normalizedName.match(prefixRegex);
-  const explicitDivision = match?.[1]?.trim();
-
-  return explicitDivision
-    ? normalizeDivision(explicitDivision)
-    : DEFAULT_DIVISION;
-}
 
 async function findSemanticCategoryDuplicate(
   ctx: QueryCtx | MutationCtx,
@@ -160,6 +125,7 @@ export const listByClubSlugWithPlayerCount = query({
     const result: Array<{
       _id: (typeof categories)[0]["_id"];
       _creationTime: number;
+      leagueCategoryId?: string;
       name: string;
       ageGroup: string;
       gender: "male" | "female" | "mixed";
@@ -176,6 +142,7 @@ export const listByClubSlugWithPlayerCount = query({
       result.push({
         _id: category._id,
         _creationTime: category._creationTime,
+        leagueCategoryId: category.leagueCategoryId,
         name: category.name,
         ageGroup: category.ageGroup,
         gender: category.gender,
@@ -264,6 +231,7 @@ export const create = mutation({
   returns: v.id("categories"),
   handler: async (ctx, args) => {
     const { club } = await requireClubAccessBySlug(ctx, args.clubSlug);
+    const { ageCategories } = await getClubLeagueCategoryConfig(ctx, club._id);
 
     const normalizedName = normalizeSpaces(args.name);
     const normalizedAgeGroup = normalizeSpaces(args.ageGroup);
@@ -285,8 +253,14 @@ export const create = mutation({
       );
     }
 
+    const leagueCategory = findLeagueAgeCategoryByAgeGroup(
+      ageCategories,
+      normalizedAgeGroup,
+    );
+
     return await ctx.db.insert("categories", {
       clubId: club._id,
+      leagueCategoryId: leagueCategory?.id,
       name: normalizedName,
       ageGroup: normalizedAgeGroup,
       gender: args.gender,
@@ -314,6 +288,10 @@ export const update = mutation({
     }
 
     await requireClubAccess(ctx, category.clubId);
+    const { ageCategories } = await getClubLeagueCategoryConfig(
+      ctx,
+      category.clubId,
+    );
 
     const { categoryId, ...updates } = args;
 
@@ -357,6 +335,14 @@ export const update = mutation({
       throw new Error(
         "A category with the same age group, gender, and division already exists",
       );
+    }
+
+    const matchedLeagueCategory = findLeagueAgeCategoryByAgeGroup(
+      ageCategories,
+      targetAgeGroup,
+    );
+    if (matchedLeagueCategory?.id !== category.leagueCategoryId) {
+      filteredUpdates.leagueCategoryId = matchedLeagueCategory?.id;
     }
 
     if (Object.keys(filteredUpdates).length > 0) {

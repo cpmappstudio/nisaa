@@ -146,12 +146,6 @@ const TEAM_ITEMS: TeamNavItem[] = [
     isIndex: false,
   },
   {
-    labelKey: "categories",
-    icon: RectangleStackIcon,
-    href: (orgSlug, teamSlug) => TEAM_ROUTES.categories(orgSlug, teamSlug),
-    isIndex: false,
-  },
-  {
     labelKey: "games",
     icon: CalendarIcon,
     href: (orgSlug, teamSlug) => TEAM_ROUTES.games.list(orgSlug, teamSlug),

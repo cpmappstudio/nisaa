@@ -11,16 +11,12 @@ import { ArrowLeft } from "lucide-react";
 import { ROUTES } from "@/lib/navigation/routes";
 import { TeamGeneralForm } from "./team-general-form";
 import { TeamPlayersTable } from "./team-players-table";
-import { TeamCategoriesTable } from "../../team-categories-table";
 import { TeamStaffClient } from "@/components/sections/shell/teams/team-staff-client";
 
 interface TeamSettingsClientProps {
   preloadedTeam: Preloaded<typeof api.clubs.getBySlug>;
   preloadedPlayers: Preloaded<
     typeof api.players.listBasketballPlayersByClubSlug
-  >;
-  preloadedCategories: Preloaded<
-    typeof api.categories.listByClubSlugWithPlayerCount
   >;
   preloadedStaff: Preloaded<typeof api.staff.listAllByClubSlug>;
   orgSlug: string;
@@ -30,7 +26,6 @@ interface TeamSettingsClientProps {
 export function TeamSettingsClient({
   preloadedTeam,
   preloadedPlayers,
-  preloadedCategories,
   preloadedStaff,
   orgSlug,
   clubSlug,
@@ -38,7 +33,6 @@ export function TeamSettingsClient({
   const t = useTranslations("Common");
   const team = usePreloadedQuery(preloadedTeam);
   const playersData = usePreloadedQuery(preloadedPlayers);
-  const categoriesData = usePreloadedQuery(preloadedCategories);
 
   if (team === null) {
     return (
@@ -67,9 +61,6 @@ export function TeamSettingsClient({
             <TabsTrigger value="general" className="flex-none shrink-0">
               {t("settings.general")}
             </TabsTrigger>
-            <TabsTrigger value="categories" className="flex-none shrink-0">
-              {t("categories.title")}
-            </TabsTrigger>
             <TabsTrigger value="players" className="flex-none shrink-0">
               {t("players.title")}
             </TabsTrigger>
@@ -81,14 +72,6 @@ export function TeamSettingsClient({
 
         <TabsContent value="general" className="mt-6">
           <TeamGeneralForm team={team} orgSlug={orgSlug} />
-        </TabsContent>
-
-        <TabsContent value="categories" className="mt-6">
-          <TeamCategoriesTable
-            categories={categoriesData}
-            clubSlug={team.slug}
-            orgSlug={orgSlug}
-          />
         </TabsContent>
 
         <TabsContent value="players" className="mt-6">

@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import { useQuery } from "convex/react";
-import { useOrganization } from "@clerk/nextjs";
 import { useRouter } from "@/i18n/navigation";
 import { api } from "@/convex/_generated/api";
 import { PlayerCard, PlayerCardSkeleton } from "./player-card";
@@ -28,7 +27,6 @@ interface RosterGridProps {
 export function RosterGrid({ clubSlug, orgSlug, routeScope }: RosterGridProps) {
   const router = useRouter();
   const t = useTranslations("Common");
-  const { organization } = useOrganization();
 
   const data = useQuery(api.players.listBasketballPlayersByClubSlug, {
     clubSlug,
@@ -36,7 +34,7 @@ export function RosterGrid({ clubSlug, orgSlug, routeScope }: RosterGridProps) {
 
   const teamConfig = useQuery(
     api.leagueSettings.getTeamConfig,
-    organization?.slug ? { leagueSlug: organization.slug } : "skip",
+    orgSlug ? { leagueSlug: orgSlug } : "skip",
   );
 
   const positionMap = useMemo(() => {

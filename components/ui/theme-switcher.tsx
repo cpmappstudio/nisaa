@@ -1,6 +1,6 @@
 "use client";
 
-import { MonitorIcon, MoonStarIcon, SunIcon } from "lucide-react";
+import { MoonStarIcon, SunIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { useTheme } from "next-themes";
 import type { JSX } from "react";
@@ -45,10 +45,6 @@ function ThemeOption({
 
 const THEME_OPTIONS = [
   {
-    icon: <MonitorIcon />,
-    value: "system",
-  },
-  {
     icon: <SunIcon />,
     value: "light",
   },
@@ -59,7 +55,7 @@ const THEME_OPTIONS = [
 ];
 
 function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
   const isMounted = useSyncExternalStore(
     () => () => {},
@@ -85,7 +81,7 @@ function ThemeSwitcher() {
           key={option.value}
           icon={option.icon}
           value={option.value}
-          isActive={theme === option.value}
+          isActive={resolvedTheme === option.value}
           onClick={setTheme}
         />
       ))}

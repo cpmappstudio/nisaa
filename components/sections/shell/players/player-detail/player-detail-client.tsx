@@ -71,6 +71,16 @@ export function PlayerDetailClient({
     return map;
   }, [teamConfig?.positions]);
   const positions = teamConfig?.positions ?? [];
+  const ageCategories = teamConfig?.ageCategories ?? [];
+  const enabledGenders =
+    (teamConfig?.enabledGenders as
+      | Array<"male" | "female" | "mixed">
+      | undefined) ??
+    (["male", "female"] as Array<"male" | "female" | "mixed">);
+  const horizontalDivisions = teamConfig?.horizontalDivisions ?? {
+    enabled: false,
+    type: "alphabetic" as const,
+  };
   const playerGameLogColumns = useMemo(
     () => createPlayerGameLogColumns(t, locale),
     [locale, t],
@@ -115,6 +125,9 @@ export function PlayerDetailClient({
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
         clubSlug={player.clubSlug}
+        ageCategories={ageCategories}
+        enabledGenders={enabledGenders}
+        horizontalDivisions={horizontalDivisions}
         positions={positions}
         player={{
           _id: player._id,
@@ -128,6 +141,10 @@ export function PlayerDetailClient({
           weight: player.weight ?? null,
           country: player.country ?? null,
           categoryId: player.categoryId,
+          categoryLeagueCategoryId: player.categoryLeagueCategoryId ?? null,
+          categoryName: player.categoryName ?? null,
+          categoryAgeGroup: player.categoryAgeGroup ?? null,
+          categoryGender: player.categoryGender ?? null,
         }}
       />
       <PlayerBioDialog

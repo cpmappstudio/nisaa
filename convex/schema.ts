@@ -143,6 +143,7 @@ export default defineSchema({
    */
   categories: defineTable({
     clubId: v.id("clubs"),
+    leagueCategoryId: v.optional(v.string()),
     name: v.string(),
     ageGroup: v.string(),
     gender: gender,

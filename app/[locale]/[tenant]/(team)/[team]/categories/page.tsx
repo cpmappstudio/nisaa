@@ -1,10 +1,7 @@
-import { TeamCategoriesClient } from "@/components/sections/shell/teams/team-categories-client";
-import { preloadQuery } from "convex/nextjs";
-import { api } from "@/convex/_generated/api";
-import { getAuthToken } from "@/lib/auth/auth";
+import { redirect } from "next/navigation";
+import { TEAM_ROUTES } from "@/lib/navigation/routes";
 
 type Params = Promise<{
-  locale: string;
   tenant: string;
   team: string;
 }>;
@@ -15,21 +12,5 @@ export default async function TeamCategoriesPage({
   params: Params;
 }) {
   const { tenant, team } = await params;
-  const token = await getAuthToken();
-
-  const preloadedCategories = await preloadQuery(
-    api.categories.listByClubSlugWithPlayerCount,
-    {
-      clubSlug: team,
-    },
-    { token },
-  );
-
-  return (
-    <TeamCategoriesClient
-      preloadedCategories={preloadedCategories}
-      clubSlug={team}
-      orgSlug={tenant}
-    />
-  );
+  redirect(TEAM_ROUTES.roster(tenant, team));
 }

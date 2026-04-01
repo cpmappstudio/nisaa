@@ -4,8 +4,8 @@
 //
 // COLOR SCHEME PROVIDER
 // =====================
-// This provider manages the active color scheme (e.g., zinc, nature, claude).
-// It works together with ThemeScript to prevent flash of unstyled content.
+// This provider exposes the active color scheme to the app.
+// The product currently keeps the scheme fixed to the default value.
 //
 // HOW TO ADD A NEW THEME:
 // -----------------------
@@ -40,24 +40,7 @@
 "use client";
 
 import * as React from "react";
-import { ColorScheme, COLOR_SCHEMES, DEFAULT_COLOR_SCHEME } from "@/lib/themes";
-
-const STORAGE_KEY = "color-scheme";
-
-function getStoredColorScheme(): ColorScheme | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY) as ColorScheme | null;
-    if (stored && COLOR_SCHEMES.includes(stored)) {
-      return stored;
-    }
-  } catch {
-    // localStorage not available
-  }
-  return null;
-}
+import { ColorScheme, DEFAULT_COLOR_SCHEME } from "@/lib/themes";
 
 interface ColorSchemeContextValue {
   colorScheme: ColorScheme;
@@ -85,34 +68,19 @@ export function ColorSchemeProvider({
   children,
   defaultScheme = DEFAULT_COLOR_SCHEME,
 }: ColorSchemeProviderProps) {
-  // Always use defaultScheme for initial render to avoid hydration mismatch
-  const [colorScheme, setColorSchemeState] =
-    React.useState<ColorScheme>(defaultScheme);
-
-  // Sync with localStorage after hydration to avoid mismatch
-  React.useEffect(() => {
-    const stored = getStoredColorScheme();
-    if (stored && stored !== colorScheme) {
-      setColorSchemeState(stored);
-    }
-    // Only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const setColorScheme = React.useCallback<
+    ColorSchemeContextValue["setColorScheme"]
+  >(() => {
+    // Theme selection is intentionally locked to the default scheme.
   }, []);
 
-  // Sync data-theme attribute when provider re-mounts (e.g., locale change)
   React.useEffect(() => {
-    document.documentElement.setAttribute("data-theme", colorScheme);
-  }, [colorScheme]);
-
-  const setColorScheme = React.useCallback((scheme: ColorScheme) => {
-    setColorSchemeState(scheme);
-    localStorage.setItem(STORAGE_KEY, scheme);
-    // Note: data-theme attribute is synced by useEffect when colorScheme changes
-  }, []);
+    document.documentElement.setAttribute("data-theme", defaultScheme);
+  }, [defaultScheme]);
 
   const value = React.useMemo(
-    () => ({ colorScheme, setColorScheme }),
-    [colorScheme, setColorScheme],
+    () => ({ colorScheme: defaultScheme, setColorScheme }),
+    [defaultScheme, setColorScheme],
   );
 
   return (

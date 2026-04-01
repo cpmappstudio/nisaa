@@ -18,6 +18,7 @@ import type * as http from "../http.js";
 import type * as leagueSettings from "../leagueSettings.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_auth_types from "../lib/auth_types.js";
+import type * as lib_categories_helpers from "../lib/categories/helpers.js";
 import type * as lib_permissions from "../lib/permissions.js";
 import type * as lib_tenancy from "../lib/tenancy.js";
 import type * as lib_validators from "../lib/validators.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   leagueSettings: typeof leagueSettings;
   "lib/auth": typeof lib_auth;
   "lib/auth_types": typeof lib_auth_types;
+  "lib/categories/helpers": typeof lib_categories_helpers;
   "lib/permissions": typeof lib_permissions;
   "lib/tenancy": typeof lib_tenancy;
   "lib/validators": typeof lib_validators;

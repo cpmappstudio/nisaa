@@ -3,6 +3,11 @@ import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { getCurrentUser } from "./lib/auth";
 import {
+  deriveCategorySelectionFromExistingClubCategory,
+  ensureClubCategoryForLeagueSelection,
+  getClubLeagueCategoryConfig,
+} from "./lib/categories/helpers";
+import {
   requireClubAccess,
   requireClubAccessBySlug,
   requireOrgAdmin,
@@ -13,6 +18,11 @@ import {
 // ============================================================================
 
 const playerStatus = v.union(v.literal("active"), v.literal("inactive"));
+const categoryGender = v.union(
+  v.literal("male"),
+  v.literal("female"),
+  v.literal("mixed"),
+);
 const playerViewerAccessLevel = v.union(
   v.literal("superadmin"),
   v.literal("admin"),
@@ -61,7 +71,10 @@ const basketballPlayerValidator = v.object({
   bioContent: v.optional(v.string()),
   country: v.optional(v.string()),
   categoryId: v.id("categories"),
+  categoryLeagueCategoryId: v.optional(v.string()),
   categoryName: v.optional(v.string()),
+  categoryAgeGroup: v.optional(v.string()),
+  categoryGender: v.optional(categoryGender),
   clubSlug: v.string(),
   clubName: v.string(),
   clubNickname: v.optional(v.string()),
@@ -83,7 +96,10 @@ const basketballPlayerDetailValidator = v.object({
   bioContent: v.optional(v.string()),
   country: v.optional(v.string()),
   categoryId: v.id("categories"),
+  categoryLeagueCategoryId: v.optional(v.string()),
   categoryName: v.optional(v.string()),
+  categoryAgeGroup: v.optional(v.string()),
+  categoryGender: v.optional(categoryGender),
   clubId: v.id("clubs"),
   clubName: v.string(),
   clubSlug: v.string(),
@@ -182,7 +198,10 @@ export const listBasketballPlayersByClubSlug = query({
           weight: player.weight,
           country: player.country,
           categoryId: player.categoryId,
+          categoryLeagueCategoryId: category?.leagueCategoryId,
           categoryName: category?.name,
+          categoryAgeGroup: category?.ageGroup,
+          categoryGender: category?.gender,
           clubSlug: club.slug,
           clubName: club.name,
           clubNickname: club.nickname,
@@ -267,7 +286,10 @@ export const listBasketballPlayersByLeagueSlug = query({
           bioContent: player.bioContent,
           country: player.country,
           categoryId: player.categoryId,
+          categoryLeagueCategoryId: category?.leagueCategoryId,
           categoryName: category?.name,
+          categoryAgeGroup: category?.ageGroup,
+          categoryGender: category?.gender,
           clubSlug: club.slug,
           clubName: club.name,
           clubNickname: club.nickname,
@@ -369,7 +391,10 @@ export const getBasketballPlayerDetailByClubSlug = query({
       bioContent: player.bioContent,
       country: player.country,
       categoryId: player.categoryId,
+      categoryLeagueCategoryId: category?.leagueCategoryId,
       categoryName: category?.name,
+      categoryAgeGroup: category?.ageGroup,
+      categoryGender: category?.gender,
       clubId: club._id,
       clubName: club.name,
       clubSlug: club.slug,
@@ -523,13 +548,18 @@ export const listBasketballPlayerGameLog = query({
     return rowsWithOpponentId
       .sort((a, b) => b.sortKey - a.sortKey)
       .slice(0, boundedLimit)
-      .map(({ teamId, opponentId, sortKey: _sortKey, ...row }) => ({
-        ...row,
-        teamName: clubMap.get(teamId)?.name ?? "Unknown",
-        teamNickname: clubMap.get(teamId)?.nickname,
-        opponentName: clubMap.get(opponentId)?.name ?? "Unknown",
-        opponentNickname: clubMap.get(opponentId)?.nickname,
-      }));
+      .map(({ teamId, opponentId, ...row }) => {
+        const { sortKey, ...resultRow } = row;
+        void sortKey;
+
+        return {
+          ...resultRow,
+          teamName: clubMap.get(teamId)?.name ?? "Unknown",
+          teamNickname: clubMap.get(teamId)?.nickname,
+          opponentName: clubMap.get(opponentId)?.name ?? "Unknown",
+          opponentNickname: clubMap.get(opponentId)?.nickname,
+        };
+      });
   },
 });
 
@@ -558,7 +588,11 @@ export const createPlayer = mutation({
     lastName: v.string(),
     photoStorageId: v.optional(v.id("_storage")),
     dateOfBirth: v.optional(v.string()),
-    categoryId: v.id("categories"),
+    categoryId: v.optional(v.id("categories")),
+    clubSlug: v.optional(v.string()),
+    leagueCategoryId: v.optional(v.string()),
+    gender: v.optional(categoryGender),
+    division: v.optional(v.string()),
     sportType: v.union(v.literal("basketball"), v.literal("soccer")),
     jerseyNumber: v.optional(v.number()),
     position: v.optional(v.string()),
@@ -570,21 +604,44 @@ export const createPlayer = mutation({
   handler: async (ctx, args) => {
     await getCurrentUser(ctx);
 
-    // Get category to find the club
-    const category = await ctx.db.get(args.categoryId);
-    if (!category) {
-      throw new Error("Category not found");
-    }
+    let resolvedClubId: Id<"clubs">;
+    let resolvedCategoryId: Id<"categories">;
 
-    await requireClubAccess(ctx, category.clubId);
+    if (args.categoryId) {
+      const category = await ctx.db.get(args.categoryId);
+      if (!category) {
+        throw new Error("Category not found");
+      }
+
+      await requireClubAccess(ctx, category.clubId);
+      resolvedClubId = category.clubId;
+      resolvedCategoryId = category._id;
+    } else {
+      if (!args.clubSlug || !args.leagueCategoryId || !args.gender) {
+        throw new Error(
+          "clubSlug, leagueCategoryId, and gender are required when categoryId is not provided",
+        );
+      }
+
+      const { club } = await requireClubAccessBySlug(ctx, args.clubSlug);
+      const resolvedCategory = await ensureClubCategoryForLeagueSelection(ctx, {
+        clubId: club._id,
+        leagueCategoryId: args.leagueCategoryId,
+        gender: args.gender,
+        division: args.division,
+      });
+
+      resolvedClubId = club._id;
+      resolvedCategoryId = resolvedCategory.categoryId;
+    }
 
     const playerId = await ctx.db.insert("players", {
       firstName: args.firstName,
       lastName: args.lastName,
       photoStorageId: args.photoStorageId,
       dateOfBirth: args.dateOfBirth,
-      clubId: category.clubId,
-      categoryId: args.categoryId,
+      clubId: resolvedClubId,
+      categoryId: resolvedCategoryId,
       sportType: args.sportType,
       jerseyNumber: args.jerseyNumber,
       position: args.position,
@@ -642,6 +699,9 @@ export const updatePlayer = mutation({
     country: v.optional(v.string()),
     status: v.optional(playerStatus),
     categoryId: v.optional(v.id("categories")),
+    leagueCategoryId: v.optional(v.string()),
+    gender: v.optional(categoryGender),
+    division: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -654,7 +714,7 @@ export const updatePlayer = mutation({
 
     await requireClubAccess(ctx, player.clubId);
 
-    const { playerId, ...updates } = args;
+    const { playerId, leagueCategoryId, gender, division, ...updates } = args;
 
     // Filter out undefined values
     const filteredUpdates: Record<string, unknown> = {};
@@ -672,6 +732,49 @@ export const updatePlayer = mutation({
 
       await requireClubAccess(ctx, targetCategory.clubId);
       filteredUpdates.clubId = targetCategory.clubId;
+      filteredUpdates.categoryId = targetCategory._id;
+    } else {
+      const shouldResyncCategory =
+        Boolean(leagueCategoryId) ||
+        division !== undefined ||
+        gender !== undefined;
+
+      if (shouldResyncCategory) {
+        const currentCategory = await ctx.db.get(player.categoryId);
+        if (!currentCategory) {
+          throw new Error("Current player category not found");
+        }
+
+        const { ageCategories } = await getClubLeagueCategoryConfig(
+          ctx,
+          player.clubId,
+        );
+        const currentSelection =
+          deriveCategorySelectionFromExistingClubCategory({
+            ageCategories,
+            category: currentCategory,
+          });
+
+        const targetLeagueCategoryId =
+          leagueCategoryId ?? currentSelection.leagueCategoryId;
+        if (!targetLeagueCategoryId) {
+          throw new Error(
+            "Current player category is no longer available in league settings. Select a new category.",
+          );
+        }
+
+        const resolvedCategory = await ensureClubCategoryForLeagueSelection(
+          ctx,
+          {
+            clubId: player.clubId,
+            leagueCategoryId: targetLeagueCategoryId,
+            gender: gender ?? currentCategory.gender,
+            division: division ?? currentSelection.division,
+          },
+        );
+        filteredUpdates.categoryId = resolvedCategory.categoryId;
+        filteredUpdates.clubId = player.clubId;
+      }
     }
 
     // If updating photo, delete old one

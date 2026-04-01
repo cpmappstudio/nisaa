@@ -30,13 +30,6 @@ export default async function TeamSettingsPage({
     },
     { token },
   );
-  const preloadedCategories = await preloadQuery(
-    api.categories.listByClubSlugWithPlayerCount,
-    {
-      clubSlug: teamId,
-    },
-    { token },
-  );
   const preloadedStaff = await preloadQuery(
     api.staff.listAllByClubSlug,
     {
@@ -49,7 +42,6 @@ export default async function TeamSettingsPage({
     <TeamSettingsClient
       preloadedTeam={preloadedTeam}
       preloadedPlayers={preloadedPlayers}
-      preloadedCategories={preloadedCategories}
       preloadedStaff={preloadedStaff}
       orgSlug={tenant}
       clubSlug={teamId}

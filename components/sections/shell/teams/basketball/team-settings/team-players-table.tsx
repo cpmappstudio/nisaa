@@ -50,6 +50,9 @@ interface PlayerRow {
   country?: string | null;
   categoryName?: string | null;
   categoryId?: string;
+  categoryLeagueCategoryId?: string | null;
+  categoryAgeGroup?: string | null;
+  categoryGender?: "male" | "female" | "mixed" | null;
   clubSlug?: string;
   clubName?: string;
   clubNickname?: string | null;
@@ -85,6 +88,26 @@ export function TeamPlayersTable({
   const positions = useMemo(
     () => teamConfig?.positions ?? [],
     [teamConfig?.positions],
+  );
+  const ageCategories = useMemo(
+    () => teamConfig?.ageCategories ?? [],
+    [teamConfig?.ageCategories],
+  );
+  const enabledGenders = useMemo(
+    () =>
+      (teamConfig?.enabledGenders as
+        | Array<"male" | "female" | "mixed">
+        | undefined) ??
+      (["male", "female"] as Array<"male" | "female" | "mixed">),
+    [teamConfig?.enabledGenders],
+  );
+  const horizontalDivisions = useMemo(
+    () =>
+      teamConfig?.horizontalDivisions ?? {
+        enabled: false,
+        type: "alphabetic" as const,
+      },
+    [teamConfig?.horizontalDivisions],
   );
 
   const positionMap = useMemo(() => {
@@ -313,6 +336,9 @@ export function TeamPlayersTable({
           open={isDialogOpen}
           onOpenChange={handleDialogClose}
           clubSlug={dialogClubSlug}
+          ageCategories={ageCategories}
+          enabledGenders={enabledGenders}
+          horizontalDivisions={horizontalDivisions}
           positions={positions}
           player={playerToEdit}
         />

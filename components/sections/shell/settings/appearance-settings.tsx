@@ -2,7 +2,6 @@
 
 import { useTranslations } from "next-intl";
 import SettingsItem from "./settings-item";
-import { ThemeSelector } from "./theme-selector";
 import { LangToggle } from "@/components/ui/lang-toggle";
 import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 
@@ -15,14 +14,7 @@ export function AppearanceSettings() {
         title={t("theme.title")}
         description={t("theme.description")}
       >
-        {/*<ModeToggle />*/}
         <ThemeSwitcher />
-      </SettingsItem>
-      <SettingsItem
-        title={t("colorScheme.title")}
-        description={t("colorScheme.description")}
-      >
-        <ThemeSelector />
       </SettingsItem>
       <SettingsItem
         title={t("language.title")}
